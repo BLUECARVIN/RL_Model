@@ -1,6 +1,6 @@
 import numpy as np
 import Memory
-import DQN_Agent
+import DoubleDQN_Agent
 import utils
 
 import gym
@@ -10,13 +10,13 @@ import torch
 def main():
 	env = gym.make('CartPole-v0')
 	ram = Memory.MemoryBuffer(30000)
-	agent = DQN_Agent.DQNAgent(env.observation_space, env.action_space, ram=None)
+	agent = DoubleDQN_Agent.DoubleDQNAgent(env.observation_space, env.action_space, ram=None)
 
 	steps_done = 0
 	episode_reward = []
 	count_eps = 0
 
-	agent.load_models('DQN_Test.pt')
+	agent.load_models('DoubleDQN_Test.pt')
 
 	for epoch in range(10000):
 		observation = env.reset()

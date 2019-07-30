@@ -9,7 +9,7 @@ import utils
 import DQN_Model
 
 
-class DQNAgent:
+class DoubleDQNAgent:
     def __init__(self, obs_space, action_space, ram):
         self.obs_dim = obs_space.shape[0]
         self.act_dim = action_space.n  # only for discrete space
@@ -77,15 +77,16 @@ class DQNAgent:
 
 
         # optimize
-        r_predict = self.gamma * torch.max(self.target_net.forward(s2), dim=1).values
+
+        #
+        action_predict = torch.argmax(self.learning_net.forward(s2), dim=1)
+        r_predict = torch.squeeze(self.target_net.forward(s2).gather(1, action_predict.view(-1,1)))
+        r_predict = self.gamma * r_predict
         y_j = r1 + r_predict
         y_j = self.done_state_value(r1, y_j, done)
 
         # r_ : Q(s_j, a_j)
         r_ = self.learning_net.forward(s1)
-        # mask = F.one_hot(torch.squeeze(a1), num_classes=self.act_dim)
-        # mask = torch.tensor(mask.clone().detach(), dtype=torch.uint8).cuda()
-        # r_ = torch.masked_select(r_, mask)
         r_ = torch.squeeze(r_.gather(1, a1.view(-1,1)))
 
         # loss: (y_j - Q(s_j, a_j))^2

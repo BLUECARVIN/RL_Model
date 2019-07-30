@@ -1,6 +1,6 @@
 import numpy as np
 import Memory
-import DQN_Agent
+import DoubleDQN_Agent
 import utils
 
 import gym
@@ -11,7 +11,7 @@ def main():
 	# env = gym.make('MountainCar-v0')
 	env = gym.make('CartPole-v0')
 	ram = Memory.MemoryBuffer(500)
-	agent = DQN_Agent.DQNAgent(env.observation_space, env.action_space,
+	agent = DoubleDQN_Agent.DoubleDQNAgent(env.observation_space, env.action_space,
 		ram)
 
 	steps_done = 0
@@ -28,7 +28,7 @@ def main():
 
 		for r in range(10000):
 			loss = 0
-			state = np.float32(observation / 4.8)
+			state = np.float32(observation)
 			action = agent.get_exploration_action(state)
 			action = np.array(action)
 
@@ -37,8 +37,8 @@ def main():
 			steps_done += 1
 			total_reward += reward
 
-			ram.add(observation / 4.8, np.expand_dims(action,axis=0), reward,
-				new_observation / 4.8, done)
+			ram.add(observation, np.expand_dims(action,axis=0), reward,
+				new_observation, done)
 
 			env.render()
 
@@ -59,7 +59,7 @@ def main():
 			# torch.mean(torch.tensor(epoch_loss, dtype=torch.float32)),
 			# steps_done))
 		if epoch % 10 == 0:
-			agent.save_models('DQN_Test')
+			agent.save_models('DoubleDQN_Test')
 			# print("save model successfully")
 
 		# test the model
