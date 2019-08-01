@@ -14,6 +14,10 @@ class DDPGAgent:
 		self.obs_dim = obs_space.shape[0]
 		self.act_dim = action_space.shape[0] # only for continiuous env
 
+		# just for one action 
+		self.action_low = action_space.low[0]
+		self.action_high = action_space.high[0]
+
 		self.ram = ram
 		self.iter = 1
 		self.steps = 0
@@ -23,6 +27,7 @@ class DDPGAgent:
 		self.end_e = 0.01
 		self.e = self.initial_e
 
+		self.start_training = 500
 		self.tau = 0.01
 		self.critic_lr = 0.001
 		self.actor_lr = 0.001
@@ -56,9 +61,44 @@ class DDPGAgent:
     def get_exploitation_action(self, state):
     	state = Variable(torch.tensor(state)).cuda()
     	action = self.actor_T.forward(state).detach().cpu()
-    	return torch.squeeze(action)
+    	action = action.data.numpy()
+    	return np.squeeze(action)
 
     def get_exploration_action(self, state):
+    	self.steps += 1
+
+    	if self.e > self.end_e and self.steps > self.start_training:
+    		self.e -= (self.initial_e - self.end_e) / 10000
+
+    	state = Variable(torch.tensor(state)).cuda()
+    	action = self.actor.forward(state).detach().cpu()
+    	action = torch.squeeze(action)
+    	action = action.data.numpy()
+
+    	noise = self.noise.sample()
+    	action_noise = (1 - self.e) * action + self.e * noise
+    	action_noise = np.clip(action_noise, self.action_low, self.action_high)
+    	return action_noise
+
+    def optimize(self):
+    	s1, a1, r1, s2, done = self.ram.sample(self.batch_size)
+
+    	s1 = Variable(torch.tensor(s1)).cuda()
+    	a1 = Variable(torch.tensor(a1)).cuda()
+    	r1 = Variable(torch.tensor(r1)).cuda()
+    	s2 = Variable(torch.tensor(s2)).cuda()
+
+    	# optimize critic
+    	a2 = self.actor_T.forward(s2).detach()
+    	r_predict = torch.squeeze(self.critic_T.forward(s2, a2).detach())
+    	r_predict = self.gamma * r_predict
+    	y_j = r1 + r_predict
+
+    	r_ = self.critic.forward(s1, a1)
+    	r_ = torch.squeeze(r_)
+
+    	self.critic_optimizer.zero_grad()
     	
+
 
 
