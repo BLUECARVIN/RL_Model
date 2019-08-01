@@ -2,17 +2,18 @@ import random
 from collections import deque
 import numpy as np
 
-class MemoryBuffer:	# continuous env memoey
-	def __init__(self, size):
-		self.buffer = deque(maxlen=size)
-		self.maxSize = size
-		self.len = 0
 
-	def sample(self, count):
-		batch = []
-		count = min(count, self.len)
-		batch = random.sample(self.buffer, count)
-
+class MemoryBuffer:# Continous env memory
+    def __init__(self, size):
+        self.buffer = deque(maxlen=size)
+        self.maxSize = size
+        self.len = 0
+    
+    def sample(self, count):
+        batch = []
+        count = min(count, self.len)
+        batch = random.sample(self.buffer, count)
+        
         s_arr = np.float32([arr[0] for arr in batch])
         a_arr = np.float32([arr[1] for arr in batch])  # action id
         r_arr = np.float32([arr[2] for arr in batch])

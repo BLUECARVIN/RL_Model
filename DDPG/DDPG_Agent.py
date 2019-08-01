@@ -1,12 +1,12 @@
 import torch
 from torch.nn import functional as F
 from torch.autograd import Variable
+from torch import nn
 
 import gym
 import numpy as np
 import utils
 import DDPG_Model
-
 
 
 class DDPGAgent:
@@ -27,7 +27,7 @@ class DDPGAgent:
 		self.end_e = 0.01
 		self.e = self.initial_e
 
-		self.start_training = 500
+		self.start_training = 100
 		self.tau = 0.01
 		self.critic_lr = 0.001
 		self.actor_lr = 0.001
@@ -35,7 +35,7 @@ class DDPGAgent:
 
 		target_net = DDPG_Model.DDPG(self.obs_dim, self.act_dim).cuda()
 		learning_net = DDPG_Model.DDPG(self.obs_dim, self.act_dim).cuda()
-		utils.hard_update(self.target_net, self.learning_net)
+		utils.hard_update(target_net, learning_net)
 
 		self.AC = learning_net
 		self.AC_T = target_net
@@ -49,75 +49,73 @@ class DDPGAgent:
 
 		self.loss_f = nn.MSELoss()
 
-	def self.save_models(self, name):
+	def save_models(self, name):
 		torch.save(self.AC_T.state_dict(), name+'.pt')
 
-    def load_models(self, name, test=False):
-    	# save_state = torch.load(name,
-    	# 	map_location=lambda storage, loc:storage)
-    	self.AC_T.load_state_dict(torch.load(name))
-    	utils.hard_update(self.AC, self.AC_T)
-    	# utils.hard_update(self.target_net, self.learning_net)
-    	print("parameters have been loaded")
+	def load_models(self, name, test=False):
 
-    def get_exploitation_action(self, state):
-    	state = Variable(torch.tensor(state)).cuda()
-    	action = self.actor_T.forward(state).detach().cpu()
-    	action = action.data.numpy()
-    	return np.squeeze(action)
+		self.AC_T.load_state_dict(torch.load(name))
+		utils.hard_update(self.AC, self.AC_T)
+		print("parameters have been loaded")
 
-    def get_exploration_action(self, state):
-    	self.steps += 1
+	def get_exploitation_action(self, state):
+		state = Variable(torch.tensor(state)).cuda()
+		action = self.actor_T.forward(state).detach().cpu()
+		action = action.data.numpy()
+		return np.squeeze(action)
 
-    	if self.e > self.end_e and self.steps > self.start_training:
-    		self.e -= (self.initial_e - self.end_e) / 10000
+	def get_exploration_action(self, state):
+		self.steps += 1
 
-    	state = Variable(torch.tensor(state)).cuda()
-    	action = self.actor.forward(state).detach().cpu()
-    	action = torch.squeeze(action)
-    	action = action.data.numpy()
+		if self.e > self.end_e and self.steps > self.start_training:
+			self.e -= (self.initial_e - self.end_e) / 10000
 
-    	noise = self.noise.sample()
-    	action_noise = (1 - self.e) * action + self.e * noise
-    	action_noise = np.clip(action_noise, self.action_low, self.action_high)
-    	return action_noise
+		state = Variable(torch.tensor(state)).cuda()
+		action = self.actor.forward(state).detach().cpu()
+		action = torch.squeeze(action)
+		action = action.data.numpy()
 
-    def optimize(self):
-    	s1, a1, r1, s2, done = self.ram.sample(self.batch_size)
+		noise = self.noise.sample()
+		action_noise = (1 - self.e) * action + self.e * noise
+		action_noise = np.clip(action_noise, self.action_low, self.action_high)
+		return action_noise
 
-    	s1 = Variable(torch.tensor(s1)).cuda()
-    	a1 = Variable(torch.tensor(a1)).cuda()
-    	r1 = Variable(torch.tensor(r1)).cuda()
-    	s2 = Variable(torch.tensor(s2)).cuda()
+	def optimize(self):
+		s1, a1, r1, s2, done = self.ram.sample(self.batch_size)
 
-    	# optimize critic
-    	a2 = self.actor_T.forward(s2).detach()
-    	r_predict = torch.squeeze(self.critic_T.forward(s2, a2).detach())
-    	r_predict = self.gamma * r_predict
-    	y_j = r1 + r_predict
+		s1 = Variable(torch.tensor(s1)).cuda()
+		a1 = Variable(torch.tensor(a1)).cuda()
+		r1 = Variable(torch.tensor(r1)).cuda()
+		s2 = Variable(torch.tensor(s2)).cuda()
 
-    	r_ = self.critic.forward(s1, a1)
-    	r_ = torch.squeeze(r_)
+		# optimize critic
+		a2 = self.actor_T.forward(s2).detach()
+		r_predict = torch.squeeze(self.critic_T.forward(s2, a2).detach())
+		r_predict = self.gamma * r_predict
+		y_j = r1 + r_predict
 
-    	self.critic_optimizer.zero_grad()
+		r_ = self.critic.forward(s1, a1)
+		r_ = torch.squeeze(r_)
 
-    	critic_loss = self.loss_f(y_j, r_)
+		self.critic_optimizer.zero_grad()
 
-    	critic_loss.backward()
-    	self.critic_optimizer.step()
+		critic_loss = self.loss_f(y_j, r_)
 
-    	# optimize actor
-    	pred_a1 = self.actor.forward(s1)
-    	actor_loss = -1 * torch.mean(self.critic.forward(s1, pred_a1))
+		critic_loss.backward()
+		self.critic_optimizer.step()
 
-    	self.actor_optimizer.zero_grad()
+		# optimize actor
+		pred_a1 = self.actor.forward(s1)
+		actor_loss = -1 * torch.mean(self.critic.forward(s1, pred_a1))
 
-    	actor_loss.backward()
-    	self.actor_optimizer.step()
+		self.actor_optimizer.zero_grad()
 
-    	# update net
-    	utils.soft_upgrad(self.AC_T, self.AC, self.tau)
+		actor_loss.backward()
+		self.actor_optimizer.step()
 
-    	return actor_loss.cpu(), critic_loss.cpu()
+		# update net
+		utils.soft_update(self.AC_T, self.AC, self.tau)
+
+		return actor_loss.cpu(), critic_loss.cpu()
 
 
