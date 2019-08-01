@@ -47,6 +47,8 @@ class DDPGAgent:
 		self.actor_optimizer = torch.optim.Adam(self.AC.actor.parameters(), self.actor_lr)
 		self.critic_optimizer = torch.optim.Adam(self.AC.critic.parameters(), self.critic_lr)
 
+		self.loss_f = nn.MSELoss()
+
 	def self.save_models(self, name):
 		torch.save(self.AC_T.state_dict(), name+'.pt')
 
@@ -98,7 +100,24 @@ class DDPGAgent:
     	r_ = torch.squeeze(r_)
 
     	self.critic_optimizer.zero_grad()
-    	
 
+    	critic_loss = self.loss_f(y_j, r_)
+
+    	critic_loss.backward()
+    	self.critic_optimizer.step()
+
+    	# optimize actor
+    	pred_a1 = self.actor.forward(s1)
+    	actor_loss = -1 * torch.mean(self.critic.forward(s1, pred_a1))
+
+    	self.actor_optimizer.zero_grad()
+
+    	actor_loss.backward()
+    	self.actor_optimizer.step()
+
+    	# update net
+    	utils.soft_upgrad(self.AC_T, self.AC, self.tau)
+
+    	return actor_loss.cpu(), critic_loss.cpu()
 
 
