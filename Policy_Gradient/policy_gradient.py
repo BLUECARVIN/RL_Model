@@ -42,8 +42,14 @@ def main():
 		batch_lens = []	# record episode lengths
 
 		observation = env.reset()
+		batch_obs.append(observation)
 
 		while True:
 			observation_v = Variable(torch.tensor(observation)).cuda()
 			action = torch.argmax(model.forward(observation_v)).detach().cpu()
+			action = np.array(action)
+
+			batch_act.append(action)
+
 			
+
